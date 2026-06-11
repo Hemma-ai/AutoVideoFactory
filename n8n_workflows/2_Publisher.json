@@ -140,7 +140,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const fs = require('fs');\nconst filePath = `C:\\\\Users\\\\DEll\\\\.n8n-files\\\\${$input.first().json.id}.mp4`;\nif (fs.existsSync(filePath)) fs.unlinkSync(filePath);\nreturn $input.all();"
+        "jsCode": "const fs = require('fs');\nconst filePath = `C:\\\\AutoVideoFactory\\\\project\\\\out\\\\${$input.first().json.id}.mp4`;\nif (fs.existsSync(filePath)) fs.unlinkSync(filePath);\nreturn $input.all();"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,

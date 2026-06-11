@@ -25,7 +25,7 @@ export const OutroScene: React.FC<{ videoThemeColor: string; videoType: string }
       <div style={{ 
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '25px',
         transform: `translateY(${textY}px)`, opacity: textOpacity,
-        fontFamily: "'Cairo', sans-serif", // توحيد الخط
+        fontFamily: "'Inter', 'Segoe UI', sans-serif",
         direction: 'ltr'
       }}>
         <div style={{ fontSize: '46px', fontWeight: '900', color: '#1A1A1A' }}>
