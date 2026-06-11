@@ -1,0 +1,215 @@
+{
+  "name": "3_DualVideo",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */8 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -400,
+        -352
+      ],
+      "id": "bef68812-381b-4664-8161-250f77934dfd",
+      "name": "Schedule Trigger2"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos_queue",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "dual_pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        -352
+      ],
+      "id": "16ffd1f1-4620-4b7d-873f-f3cccc0f573b",
+      "name": "Get many rows (videos_queue)9",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst { execSync } = require('child_process'); // 🟢 تمت الإضافة لحساب المدة\n\nconst items = $input.all();\nconst publicDir = `C:\\\\Users\\\\DEll\\\\my-video\\\\public`;\nconst baseBackgroundsDir = `C:\\\\Users\\\\DEll\\\\my-video\\\\backgrounds`;\n\nif (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });\n\nlet mainFolder = `${baseBackgroundsDir}\\\\main_videos`; \nlet satisfyingFolder = `${baseBackgroundsDir}\\\\satisfying`;\nlet completedFolder = `${baseBackgroundsDir}\\\\completed_videos`; \n\nif (!fs.existsSync(completedFolder)) fs.mkdirSync(completedFolder, { recursive: true });\n\nlet mainVideos = fs.existsSync(mainFolder) ? fs.readdirSync(mainFolder).filter(f => f.endsWith('.mp4')) : [];\nmainVideos.sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));\n\nlet satisfyingVideos = fs.existsSync(satisfyingFolder) ? fs.readdirSync(satisfyingFolder).filter(f => f.endsWith('.mp4')) : [];\n\nif (mainVideos.length === 0 || satisfyingVideos.length === 0) {\n    throw new Error(\"انتهت الفيديوهات! تأكد من وضع فيديوهات جديدة في مجلد main_videos\");\n}\n\nconst finalItems = [];\n\nfor (let i = 0; i < items.length; i++) {\n    let item = items[i].json;\n\n    let mainVideoName = mainVideos.shift(); \n    if (!mainVideoName) throw new Error(\"نفدت الفيديوهات الأساسية أثناء المعالجة!\");\n\n    let sourceFilePath = `${mainFolder}\\\\${mainVideoName}`;\n    let mainTargetName = `scene_${i}_main.mp4`;\n    let targetFilePath = `${publicDir}\\\\${mainTargetName}`;\n\n    if (fs.existsSync(targetFilePath)) fs.unlinkSync(targetFilePath);\n    fs.copyFileSync(sourceFilePath, targetFilePath);\n\n    let completedFilePath = `${completedFolder}\\\\${mainVideoName}`;\n    fs.renameSync(sourceFilePath, completedFilePath);\n\n    let extractedTitle = mainVideoName.replace(/\\.[^/.]+$/, \"\"); \n    item.youtube_title = extractedTitle;\n    item.title = extractedTitle;\n\n    // 🟢 السحر هنا: حساب المدة الحقيقية للفيديو الأساسي بدقة عالية 🟢\n    let durationInSeconds = 120; // قيمة افتراضية للحماية\n    try {\n        let cmd = `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 \"${targetFilePath}\"`;\n        let probeResult = execSync(cmd).toString().trim();\n        if (probeResult) {\n            durationInSeconds = parseFloat(probeResult);\n        }\n    } catch (e) {\n        console.log(\"ffprobe error: \", e.message);\n    }\n\n    // تحويل المدة الحقيقية إلى إطارات (Frames)\n    item.durationInFrames = Math.ceil(durationInSeconds * 30); \n\n    satisfyingVideos.sort(() => Math.random() - 0.5); \n    let urlsRight = [];\n    \n    for (let v = 0; v < 24; v++) {\n        let satName = satisfyingVideos[v % satisfyingVideos.length]; \n        let satTargetName = `scene_${i}_sat_${v}.mp4`;\n        let satTargetPath = `${publicDir}\\\\${satTargetName}`;\n        if (fs.existsSync(satTargetPath)) fs.unlinkSync(satTargetPath);\n        fs.copyFileSync(`${satisfyingFolder}\\\\${satName}`, satTargetPath);\n        urlsRight.push(satTargetName);\n    }\n\n    item.main_video_url = mainTargetName;\n    item.satisfying_urls = urlsRight;\n    item.video_type = \"dual_video\";\n    \n    finalItems.push({ json: item });\n}\n\nreturn finalItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        -352
+      ],
+      "id": "c64acfdb-26dc-45c3-942b-b88771752f1a",
+      "name": "Video Downloader1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const currentData = $input.all(); \nconst fs = require('fs'); \nconst { spawn } = require('child_process');\n\nconst projectDir = `C:\\\\Users\\\\DEll\\\\my-video`;\nconst publicDir = `${projectDir}\\\\public`;\nconst runId = Date.now();\nconst propsPath = `${projectDir}\\\\props_${runId}.json`;\n\nconst scenesArray = currentData.map((item, i) => {\n    let scene = item.json;\n    // 🟢 السحر هنا: استخدام مدة الفيديو الحقيقية التي حسبها الداونلودر 🟢\n    let frames = scene.durationInFrames || 3600; \n\n    return {\n        scene_number: i + 1,\n        main_video_url: scene.main_video_url,\n        satisfying_urls: scene.satisfying_urls,\n        durationInFrames: frames, // تمرير المدة الصحيحة\n        title: scene.youtube_title || scene.title || \"مقطع ممتع\"\n    };\n});\n\nconst finalJson = {\n    scenes: scenesArray,\n    video_type: \"dual_video\", \n    title: \"Dual_Video\"\n};\n\nfs.writeFileSync(propsPath, JSON.stringify(finalJson, null, 2));\n\nfunction runRenderCommand(command, workingDir) {\n  return new Promise((resolve, reject) => {\n    const process = spawn(command, { shell: true, cwd: workingDir });\n    let fullLogs = '';\n    process.stdout.on('data', (data) => { fullLogs += data.toString(); });\n    process.stderr.on('data', (data) => { fullLogs += data.toString(); });\n    process.on('close', (code) => {\n      if (code === 0) resolve(fullLogs);\n      else reject(new Error(`فشلت الرندرة:\\n${fullLogs}`));\n    });\n  });\n}\n\ntry {\n  let finalTitle = currentData[0].json.youtube_title || currentData[0].json.title || \"مقطع_مزدوج\";\n  const safeTitle = finalTitle.replace(/[<>:\"\\/\\\\|?*]+/g, '').trim().substring(0, 80);\n  const outputVideoPath = `C:\\\\Users\\\\DEll\\\\.n8n-files\\\\${safeTitle}.mp4`;\n\n  // 🟢 إضافة --pixel-format yuv420p لضمان الثبات اللوني\n  const renderCommand = `npx remotion render src/index.ts MyDualVideo \"${outputVideoPath}\" --props=\"${propsPath}\" --concurrency=3 --gl=angle --pixel-format=yuv420p --timeout=120000 --log=info`;\n  \n  await runRenderCommand(renderCommand, projectDir);\n\n  try {\n    if (fs.existsSync(propsPath)) fs.unlinkSync(propsPath);\n    const files = fs.readdirSync(publicDir);\n    for (const file of files) {\n      if (file.startsWith(`scene_`)) fs.unlinkSync(`${publicDir}\\\\${file}`);\n    }\n  } catch (e) { }\n\n  const wordsArray = finalTitle.split(/\\s+/).filter(word => word.length > 2 && word !== \"الجزء\" && !/\\d/.test(word));\n  const hashtagsString = wordsArray.map(word => '#' + word).join(' ');\n  const finalDescription = `${finalTitle}\\n\\nنتمنى لكم مشاهدة ممتعة مع هذا المقطع، لا تنسوا الاشتراك!\\n\\n${hashtagsString}`;\n\n  return [{ \n      json: { \n          message: `✅ تمت الرندرة بنجاح!`, \n          video_location: outputVideoPath,\n          youtube_title: finalTitle,\n          youtube_description: finalDescription, \n          youtube_tags: wordsArray               \n      } \n  }];\n} catch (error) {\n  return [{ json: { message: \"❌ خطأ أثناء الرندرة!\", error_details: error.message } }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        192,
+        -352
+      ],
+      "id": "769909f4-44ae-4bc9-85f5-c496dfac7a51",
+      "name": "Video Renderer1",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $json.fileName }}",
+        "regionCode": "SA",
+        "categoryId": "22",
+        "binaryProperty": "=data",
+        "options": {
+          "description": "={{ $('Video Renderer1').first().json.youtube_description }}",
+          "privacyStatus": "public",
+          "tags": "={{ $('Video Renderer1').first().json.youtube_tags.join(',') }}"
+        }
+      },
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        544,
+        -352
+      ],
+      "id": "f6f473bc-0df1-468f-b77a-6ef35f14053a",
+      "name": "Upload a video1",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "5iCO3u4UbAFBk99N",
+          "name": "YouTube account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileSelector": "={{ $json.video_location }}",
+        "options": {
+          "fileName": "video"
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        368,
+        -352
+      ],
+      "id": "cfb50c6e-f1cc-4e88-9328-3f8e4ec1ddac",
+      "name": "Read/Write Files from Disk2"
+    }
+  ],
+  "pinData": {
+    "Schedule Trigger2": [
+      {
+        "json": {
+          "isArtificialRecoveredEventItem": true
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Schedule Trigger2": {
+      "main": [
+        [
+          {
+            "node": "Get many rows (videos_queue)9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows (videos_queue)9": {
+      "main": [
+        [
+          {
+            "node": "Video Downloader1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Downloader1": {
+      "main": [
+        [
+          {
+            "node": "Video Renderer1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk2": {
+      "main": [
+        [
+          {
+            "node": "Upload a video1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Renderer1": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Riyadh",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataSuccessExecution": "none",
+    "executionTimeout": 3600
+  },
+  "versionId": "51096793-2c06-4894-8e49-e03d1d6297c4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b2e4d510474f0b7e524f121cf2acc761872752802d0e0f42b9696eba56288a13"
+  },
+  "id": "tcKN78gnkiTJIOBu",
+  "tags": []
+}

@@ -1,0 +1,47 @@
+📦 AutoVideoFactory_Package.zip
+
+┣ 📂 project
+
+┃ ┣ 📂 src
+
+┃ ┃ ┣ 📜 Root.tsx
+
+┃ ┃ ┣ 📜 MyMysteryVideo.tsx
+
+┃ ┃ ┣ 📜 DynamicScene.tsx
+
+┃ ┃ ┣ 📜 OutroScene.tsx
+
+┃ ┃ ┣ 📜 index.ts
+
+┃ ┃ ┗ 📜 your_logo.png (Default logo, transparent, for the client to replace later)
+
+┃ ┣ 📂 public
+
+┃ ┃ ┗ 📜 wisdom_bgm1.mp3 (Very short, royalty-free background audio files for example)
+
+┃ ┣ 📜 package.json (Online library download catalog)
+
+┃ ┣ 📜 index.css
+
+┃ ┣ 📜 remotion.config.ts
+
+┃ ┗ 📜 tsconfig.json
+
+┣ 📂 backgrounds
+
+┃ ┣ 📂 story_wisdom (Empty folder where the client places their videos)
+
+┃ ┗ 📂 satisfying (Empty folder for double-sided videos)
+
+┣ 📂 n8n_workflows
+
+┃ ┣ 📜 1_Generator.json (Main automation and editing file)
+
+┃ ┣ 📜 2_Publisher.json (File Automatic YouTube posting
+
+┃ ┗ 📜 3_DualVideo.json (Dual-clip automation file)
+
+┣ 📜 schema.sql (One-click Subbase table builder code)
+
+┗ 📜 ReadMe_Instructions.txt (Welcome text file containing the secret video link for the tutorial)

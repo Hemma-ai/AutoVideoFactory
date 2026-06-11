@@ -1,0 +1,239 @@
+{
+  "name": "2_Publisher",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "videos_queue",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get many rows (videos_queue)7').item.json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "published"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        416,
+        -288
+      ],
+      "id": "4f63b2e2-0dbe-4eed-94c6-dfcd0c4070da",
+      "name": "Get many rows (videos_queue)1",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "resource": "video",
+        "operation": "upload",
+        "title": "={{ $('Get many rows (videos_queue)7').item.json.title}}",
+        "regionCode": "SA",
+        "categoryId": "22",
+        "binaryProperty": "=data",
+        "options": {
+          "description": "={{ $('Get many rows (videos_queue)7').item.json.script }}",
+          "privacyStatus": "public",
+          "tags": "={{ $('Get many rows (videos_queue)7').item.json.tags }}"
+        }
+      },
+      "type": "n8n-nodes-base.youTube",
+      "typeVersion": 1,
+      "position": [
+        256,
+        -288
+      ],
+      "id": "ac8f96c0-c5e3-48e0-9917-05932c6534e4",
+      "name": "Upload a video",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "credentials": {
+        "youTubeOAuth2Api": {
+          "id": "c6dnBBQ0o7JrJ2GH",
+          "name": "YouTube account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fileSelector": "=C:/Users/DEll/.n8n-files/{{ $json.id }}.mp4",
+        "options": {
+          "fileName": "video"
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        96,
+        -288
+      ],
+      "id": "b84b7043-81e5-4040-8468-fb7fc480e959",
+      "name": "Read/Write Files from Disk"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 */6 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -256,
+        -288
+      ],
+      "id": "ac16d1ef-0733-4653-829c-6d9e71284b99",
+      "name": "Schedule Trigger1"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos_queue",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "ready"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -288
+      ],
+      "id": "5d952dc3-9c7d-485e-81ba-f1daedf76b7a",
+      "name": "Get many rows (videos_queue)7",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst filePath = `C:\\\\Users\\\\DEll\\\\.n8n-files\\\\${$input.first().json.id}.mp4`;\nif (fs.existsSync(filePath)) fs.unlinkSync(filePath);\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        -288
+      ],
+      "id": "9c3ff1fc-f3fe-4253-9bce-fa7a0ae8e2a4",
+      "name": "Code in JavaScript6"
+    }
+  ],
+  "pinData": {
+    "Schedule Trigger1": [
+      {
+        "json": {
+          "isArtificialRecoveredEventItem": true
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Get many rows (videos_queue)1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "Upload a video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload a video": {
+      "main": [
+        [
+          {
+            "node": "Get many rows (videos_queue)1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger1": {
+      "main": [
+        [
+          {
+            "node": "Get many rows (videos_queue)7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows (videos_queue)7": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Riyadh",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataSuccessExecution": "none",
+    "executionTimeout": 3600
+  },
+  "versionId": "b9105d29-7112-4439-9ac0-a4b6ccd50e07",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b2e4d510474f0b7e524f121cf2acc761872752802d0e0f42b9696eba56288a13"
+  },
+  "id": "kEJMV5lkgkxU0DoB",
+  "tags": []
+}

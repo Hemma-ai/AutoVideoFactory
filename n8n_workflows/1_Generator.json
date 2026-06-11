@@ -1,0 +1,1476 @@
+{
+  "name": "1_Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos_queue",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "pending"
+            },
+            {
+              "keyName": "category",
+              "condition": "eq",
+              "keyValue": "story_wisdom"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1360,
+        368
+      ],
+      "id": "7d3eba34-4451-4c28-8367-4d86d571894c",
+      "name": "Get many rows (videos_queue)",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "jsCode": "const scriptText = $('Message a model').item.json.content.parts[0].text;\nlet jsonMatch = scriptText.match(/\\{[\\s\\S]*\\}/);\n\nif (!jsonMatch) {\n  return [{ json: { status: \"failed\", error_message: \"لم يتم العثور على JSON.\" } }];\n}\n\nlet parsedData;\ntry { \n  // 🟢 السحر الهندسي هنا: استبدال أي سطر جديد (Enter) بمسافة عادية حتى لا ينهار الـ JSON 🟢\n  let safeJsonString = jsonMatch[0].replace(/[\\n\\r\\t]/g, ' ');\n  \n  parsedData = JSON.parse(safeJsonString); \n} \ncatch (error) { \n  return [{ json: { status: \"failed\", error_message: \"JSON غير صالح.\", details: error.message } }]; \n}\n\nconst allItems = []; \n\n// 🎯 1. أخذ تصنيف الموضوع الحالي من قاعدة البيانات مباشرة (كما طلبت)\nconst currentCategory = $('Get many rows (videos_queue)').first().json.category || \"story_craft\"; \n\nif (parsedData.scenes && Array.isArray(parsedData.scenes)) {\n  parsedData.scenes.forEach(scene => {\n    allItems.push({\n      json: {\n        ...scene,\n        category: currentCategory, // تطبيق التصنيف المجلوب من الجدول على المشاهد\n        title: parsedData.title || \"\",\n        description: parsedData.description || \"\",\n        tags: parsedData.tags || \"\",\n        route_type: \"scene\" \n      }\n    });\n  });\n}\n\nif (parsedData.new_topic) {\n    // 🎯 تطبيق نظام الوسم الصارم: تجاهل تخريف جيميناي تماماً وفرض التصنيف الحالي على الموضوع الجديد\n    let strictCategory = currentCategory;\n\n    allItems.push({\n      json: {\n        topic: parsedData.new_topic,\n        category: strictCategory, // حقن التصنيف الصحيح 100% في قاعدة البيانات\n        status: \"pending\",\n        route_type: \"topic\" \n      }\n    });\n}\n\nreturn allItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -368,
+        160
+      ],
+      "id": "db5361c2-78ec-4827-8bb8-cb6815706957",
+      "name": "Code",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const scriptText = $('Message a model').item.json.content.parts[0].text;\nconst jsonMatch = scriptText.match(/\\{[\\s\\S]*\\}/);\nif (!jsonMatch) throw new Error(\"فشل: جيميناي لم يقم بإرجاع JSON صالح!\");\n\n// 🟢 السحر الهندسي هنا: تنظيف الـ JSON من أي أسطر جديدة أو مسافات تاب مخفية قبل التحويل 🟢\nlet safeJsonString = jsonMatch[0].replace(/[\\n\\r\\t]/g, ' ');\n\nconst parsedData = JSON.parse(safeJsonString);\n\n// 🎯 القوة هنا: استدعاء التصنيف من قاعدة البيانات متجاهلاً أخطاء جيميناي تماماً\nconst dbCategory = $('Get many rows (videos_queue)').first().json.category || \"story_craft\";\n\nreturn parsedData.scenes.map((scene, index) => {\n  // 🎯 الاعتماد على الفهرس البرمجي لضمان الحقن في المشهد الأول دائماً\n  \n  scene.mood = parsedData.mood || \"mystery\";\n  scene.title = parsedData.title;\n  scene.description = parsedData.description;\n  scene.tags = parsedData.tags;\n  scene.category = dbCategory; \n  \n  return { json: scene };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        80,
+        144
+      ],
+      "id": "38b8a4a1-b3b3-4ebe-b4bb-e6e9f81139ec",
+      "name": "Code1"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.final_prompt }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -704,
+        176
+      ],
+      "id": "9e4d8a92-bf37-4980-95cc-420f04f65a5b",
+      "name": "Message a model",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 3,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "foAo7qqRWUx3hA0n",
+          "name": "Google Gemini(PaLM) Api account 3"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "videos_queue",
+        "dataToSend": "autoMapInputData",
+        "inputsToIgnore": "=route_type"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        336
+      ],
+      "id": "28745634-a956-4ec4-ad6c-0140f1382837",
+      "name": "Get many rows (videos_queue)2",
+      "executeOnce": false,
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route_type }}",
+                    "rightValue": "scene",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "2ad18120-69fe-4ed6-a54f-fe19a298be6b"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Scenes"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c9ef6e02-e7cf-46fc-b937-69d072d7c3cd",
+                    "leftValue": "={{ $json.route_type }}",
+                    "rightValue": "topic",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "New Topics"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -240,
+        160
+      ],
+      "id": "275f3947-1c17-4f87-8b8c-d7caaa5c516a",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "15,45 * * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1984,
+        160
+      ],
+      "id": "109c37fa-9ed4-4134-bb57-981908d10e47",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { exec } = require('child_process');\nconst fs = require('fs'); \n\nconst publicDir = `C:\\\\Users\\\\DEll\\\\my-video\\\\public`;\nif (!fs.existsSync(publicDir)) {\n  fs.mkdirSync(publicDir, { recursive: true });\n}\n\nfunction runCommand(command) {\n  return new Promise((resolve, reject) => {\n    exec(command, (error, stdout, stderr) => {\n      if (error) { reject(error); return; }\n      resolve(stdout);\n    });\n  });\n}\n\nconst items = $input.all();\nconst finalItems = [];\nconst runId = Date.now(); \n\n// 🟢 تحديد المشهد المستهدف (المشهد الأوسط في الفيديو) لكي لا تتكرر الجملة 3 مرات 🟢\nconst targetSceneIndex = Math.floor(items.length / 2);\n\nfor (let i = 0; i < items.length; i++) {\n  let item = items[i].json;\n  \n  let category = item.category || items[0].json.category || \"story_craft\";\n  \n  if (item.voiceover_ar && category !== 'promo') {\n    \n    let safeText = item.voiceover_ar.replace(/\"/g, ' ').replace(/'/g, ' ').replace(/\\n/g, ' ');\n    \n    if (item.title) {\n        let safeTitle = item.title.replace(/\"/g, ' ').replace(/'/g, ' ').replace(/\\n/g, ' ');\n        safeText = safeText.replace(safeTitle, ''); \n    }\n    safeText = safeText.replace(/العنوان:/g, '').trim(); \n\n    // 🟢 السحر هنا: الزرع العضوي الذكي (لمشهد واحد فقط، وبعد اكتمال المعنى) 🟢\n    if ((category === 'story_craft' || category === 'story_religion') && i === targetSceneIndex) {\n        let wordsArray = safeText.split(/\\s+/);\n        let middleIndex = Math.floor(wordsArray.length / 2); \n        \n        // البحث عن أقرب فاصلة أو نقطة بعد المنتصف لكي لا نقطع الجملة\n        let insertIndex = middleIndex;\n        for (let w = middleIndex; w < wordsArray.length; w++) {\n            // إذا كانت الكلمة تنتهي بفاصلة، نقطة، أو علامة استفهام\n            if (wordsArray[w].match(/[.،؟!]/)) {\n                insertIndex = w + 1; // نزرع الجملة بعد هذه الكلمة\n                break;\n            }\n        }\n\n        // إضافة نقاط وفواصل لإجبار المعلق الصوتي (edge-tts) على التوقف لثانية وأخذ نفس\n        let ctaText = \". ولا تنسوا الإعجاب والاشتراك في القناة .\";\n        let ctaWords = ctaText.split(\" \");\n\n        item.cta_start = insertIndex;\n        item.cta_end = insertIndex + ctaWords.length - 1;\n\n        // زرع الجملة في المكان الصحيح\n        wordsArray.splice(insertIndex, 0, ...ctaWords);\n        \n        safeText = wordsArray.join(\" \");\n        item.voiceover_ar = safeText; \n    }\n    \n    let baseName = `voice_${runId}_scene_${item.scene_number || (i + 1)}`;\n    let mp3FileName = `${baseName}.mp3`;\n    let vttFileName = `${baseName}.vtt`; \n    \n    let mp3Path = `${publicDir}\\\\${mp3FileName}`;\n    let vttPath = `${publicDir}\\\\${vttFileName}`;\n    \n    let voiceRate = \"+15%\"; \n    if (category === 'story_religion') {\n        voiceRate = \"+5%\";  \n    }\n\n    let cmd = `edge-tts --voice ar-SA-HamedNeural --rate=\"${voiceRate}\" --pitch=\"-5Hz\" --text \"${safeText}\" --write-media \"${mp3Path}\" --write-subtitles \"${vttPath}\"`;\n    \n    try {\n      await runCommand(cmd);\n      item.audio_url = mp3FileName; \n      item.audio_status = \"Success\";\n\n      let maxSeconds = 0;\n\n      if (fs.existsSync(vttPath)) {\n        try {\n            let vttContent = fs.readFileSync(vttPath, 'utf8');\n            let timeRegex = /(?:(\\d+):)?(\\d+):(\\d+)[.,](\\d+)/g;\n            let match;\n            \n            while ((match = timeRegex.exec(vttContent)) !== null) {\n                let h = match[1] ? parseInt(match[1], 10) : 0;\n                let m = parseInt(match[2], 10);\n                let s = parseInt(match[3], 10);\n                let msFraction = parseFloat(`0.${match[4]}`);\n                let total = (h * 3600) + (m * 60) + s + msFraction;\n                if (total > maxSeconds) maxSeconds = total;\n            }\n        } catch(e) {\n            console.log(\"Error parsing VTT:\", e.message);\n        }\n        try { fs.unlinkSync(vttPath); } catch(e) {}\n      }\n\n      if (maxSeconds === 0) {\n          let wordsCount = safeText.split(/\\s+/).length;\n          maxSeconds = (wordsCount * 0.55) + 1; \n      }\n\n      let audioDurationFrames = Math.ceil(maxSeconds * 30); \n      let exactFrames = audioDurationFrames + 30; \n\n      item.audioDurationFrames = audioDurationFrames; \n      item.durationInFrames = exactFrames; \n\n    } catch (error) {\n      item.audio_status = \"Failed\";\n      item.audio_error = error.message;\n      item.audioDurationFrames = 0;\n      item.durationInFrames = 150;\n    }\n  } else if (category === 'promo') {\n    item.audio_status = \"Skipped (Promo)\";\n    item.audio_url = \"\";\n    item.durationInFrames = 120; \n    item.audioDurationFrames = 0;\n  }\n  \n  finalItems.push({ json: item });\n}\n\nreturn finalItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        288,
+        144
+      ],
+      "id": "9fceb094-a61a-41ab-83e2-5c9ef3068fbb",
+      "name": "Code in JavaScript3"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "prompts",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "is_active",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1360,
+        0
+      ],
+      "id": "3adbcfd4-fcf3-4c90-9dee-e8ffba85215d",
+      "name": "Get many rows (videos_queue)3",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allPrompts = $input.all().map(item => item.json);\n\n// تجميع كل البرومبتات في مصفوفة واحدة وتمريرها للمرحلة التالية بدلاً من الاختيار العشوائي\nreturn [{ json: { all_prompts: allPrompts } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1184,
+        0
+      ],
+      "id": "1c2ea6d1-dd16-462e-81e0-c695f2ba1266",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos_queue",
+        "limit": 30,
+        "filterType": "none"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1376,
+        176
+      ],
+      "id": "644d3654-b486-408d-889b-7459cb558d11",
+      "name": "Get many rows (videos_queue)4",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet recentTopicsList = items.map(item => item.json.topic).join(\"، \");\nreturn [{ json: { recent_topics: recentTopicsList } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        176
+      ],
+      "id": "3453085d-cfe2-4f01-b109-5d90ea2e160b",
+      "name": "Code in JavaScript2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet mergedData = {};\n\nitems.forEach(item => {\n  mergedData = { ...mergedData, ...item.json };\n});\n\nif (mergedData.all_prompts) {\n    // 🟢 السحر هنا: تحديد صارم ومباشر للبرومبت الديني (ID: 2) 🟢\n    let targetId = 2; \n    \n    let matchingPrompt = mergedData.all_prompts.find(p => p.id === targetId) || mergedData.all_prompts[0];\n    let text = matchingPrompt.prompt_content;\n    \n    text = text.replace('{{ $json.topic }}', mergedData.topic || '');\n    text = text.replace('{{ $json.recent_topics }}', mergedData.recent_topics || '');\n    \n    mergedData.final_prompt = text;\n}\n\ndelete mergedData.all_prompts;\nreturn [{ json: mergedData }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        176
+      ],
+      "id": "fe9ea6c9-40e0-4051-b1ab-720143fba965",
+      "name": "Code in JavaScript4"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -976,
+        160
+      ],
+      "id": "3512fa3e-70aa-49c7-92fc-4481bff19531",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "videos_queue",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get many rows (videos_queue)').first().json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        320
+      ],
+      "id": "bbaa1a21-5acc-49ec-a27d-28f5b24cb7e1",
+      "name": "Get many rows (videos_queue)5",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "videos_queue",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get many rows (videos_queue)').first().json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "ready"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $('Code1').item.json.title }}"
+            },
+            {
+              "fieldId": "script",
+              "fieldValue": "={{ $('Code1').item.json.description }}"
+            },
+            {
+              "fieldId": "tags",
+              "fieldValue": "={{ $('Code1').item.json.tags }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        848,
+        144
+      ],
+      "id": "eb2479bc-20b1-40cc-aecd-4ec72ed6638a",
+      "name": "Get many rows (videos_queue)6",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos_queue",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "ready"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1792,
+        160
+      ],
+      "id": "ea72c840-22ac-4969-89df-51f950f970df",
+      "name": "Get many rows (videos_queue)8",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1804b8bf-5e0f-41c9-b1c4-1e1a3c68fba7",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 4,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1648,
+        160
+      ],
+      "id": "1ce3c91e-10db-49b9-891b-b54d225c6d22",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\n\nconst items = $input.all();\nconst publicDir = `C:\\\\Users\\\\DEll\\\\my-video\\\\public`;\nconst baseBackgroundsDir = `C:\\\\Users\\\\DEll\\\\my-video\\\\backgrounds`;\n\nif (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });\n\nfunction removeTashkeel(text) {\n    if (!text) return \"\";\n    return text.replace(/[\\u064B-\\u0652\\u0640]/g, \"\");\n}\n\nconst preSelectedVideos = [];\n\nfor (let i = 0; i < items.length; i++) {\n    let item = items[i].json;\n\n    let category = item.category || \"story_craft\";\n    let folderName = \"nature\"; // الافتراضي\n    let isStory = false; // متغير لمعرفة هل هو محتوى قصصي أم مؤسسي\n\n    // 🟢 1. تصحيح مسار المجلدات كما طلبت تماماً 🟢\n    if (category === \"story_craft\") {\n        folderName = \"satisfying\";      // الواقعي للمجلد satisfying\n        isStory = true;\n    } else if (category === \"story_religion\") {\n        folderName = \"nature\";  // الديني للمجلد nature\n        isStory = true;\n    } else if (category === \"promo\") {\n        folderName = \"furniture\";   // الإعلاني\n    } else if (category === \"advice\") {\n        folderName = \"promo_wood\";  // النصائح\n    }\n\n    let sourceFolder = `${baseBackgroundsDir}\\\\${folderName}`;\n\n    let availableVideos = [];\n    if (fs.existsSync(sourceFolder)) {\n        availableVideos = fs.readdirSync(sourceFolder).filter(file => file.endsWith('.mp4'));\n    }\n\n    if (availableVideos.length === 0) {\n        throw new Error(`المجلد ${sourceFolder} فارغ تماماً! يرجى إضافة فيديوهات.`);\n    }\n\n    // خلط عشوائي للفيديوهات\n    for (let m = availableVideos.length - 1; m > 0; m--) {\n        const j = Math.floor(Math.random() * (m + 1));\n        [availableVideos[m], availableVideos[j]] = [availableVideos[j], availableVideos[m]];\n    }\n\n    preSelectedVideos.push({ sourceFolder, availableVideos, isStory });\n}\n\nconst finalItems = [];\nlet videoIndex = 0;\n\nfor (let i = 0; i < items.length; i++) {\n    let item = items[i].json;\n    \n    let currentFolderData = preSelectedVideos[i];\n    let sourceFolder = currentFolderData.sourceFolder;\n    let availableVideos = currentFolderData.availableVideos;\n    let isStory = currentFolderData.isStory;\n\n    if (videoIndex >= availableVideos.length) {\n        videoIndex = 0; \n    }\n\n    let selectedVideoUrls = [];\n    \n    // 🟢 2. السحر الديناميكي: حساب عدد الفيديوهات المطلوبة بناءً على مدة الصوت 🟢\n    let videosPerScene = 1; // الافتراضي للمؤسسي (فيديو واحد فقط)\n    \n    if (isStory) {\n        // محاولة استخراج مدة الصوت بالثواني من البيانات (مع وضع 60 ثانية كاحتياط أولي)\n        let durationInSeconds = 60; \n        if (item.audioDurationFrames) {\n            durationInSeconds = item.audioDurationFrames / 30; // تحويل الإطارات إلى ثواني\n        } else if (item.audio_duration) {\n            durationInSeconds = item.audio_duration;\n        } else if (item.durationInFrames) {\n            durationInSeconds = item.durationInFrames / 30;\n        }\n\n        // كل مقطع سيكون 6 ثواني، نقسم المدة الكلية على 6 ونقرب للأكبر\n        const clipDurationSeconds = 6;\n        videosPerScene = Math.ceil(durationInSeconds / clipDurationSeconds);\n        \n        // حماية: التأكد من سحب مقطع واحد على الأقل حتى لو كانت المدة قصيرة جداً\n        if (videosPerScene < 1) videosPerScene = 1;\n    }\n\n    try {\n        for (let v = 0; v < videosPerScene; v++) {\n            // العودة لأول فيديو في المجلد إذا طلب الكود فيديوهات أكثر من المتاحة\n            if (videoIndex >= availableVideos.length) videoIndex = 0; \n            \n            let selectedVideoName = availableVideos[videoIndex];\n            let sourceVideoPath = `${sourceFolder}\\\\${selectedVideoName}`;\n            let localVideoName = `scene_${item.scene_number || (i + 1)}_part_${v}.mp4`;\n            let targetVideoPath = `${publicDir}\\\\${localVideoName}`;\n            \n            if (fs.existsSync(targetVideoPath)) fs.unlinkSync(targetVideoPath);\n            fs.copyFileSync(sourceVideoPath, targetVideoPath);\n            \n            selectedVideoUrls.push(localVideoName);\n            videoIndex++;\n        }\n\n        if (item.voiceover_ar) {\n            item.voiceover_ar = removeTashkeel(item.voiceover_ar);\n        }\n\n        // 🟢 3. توجيه المخرجات لبرنامج المونتاج 🟢\n        if (isStory) {\n            item.video_urls = selectedVideoUrls; // نرسل المصفوفة الديناميكية للقصص\n            item.video_url = selectedVideoUrls[0]; \n            item.download_status = `Success (${videosPerScene} Alternating Clips)`;\n        } else {\n            item.video_urls = []; // نفرغ المصفوفة في الإعلاني لمنع التناوب\n            item.video_url = selectedVideoUrls[0]; // نرسل فيديو واحد فقط\n            item.download_status = \"Success (Single Promo Video)\";\n        }\n\n    } catch (e) {\n        item.download_status = \"Failed\";\n        item.video_urls = [];\n        item.video_url = \"\";\n        item.error_details = e.message;\n    }\n\n    finalItems.push({ json: item });\n}\n\nreturn finalItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        464,
+        144
+      ],
+      "id": "58d9913e-dfa2-4f9e-9472-3555d3c681a9",
+      "name": "Video Downloader"
+    },
+    {
+      "parameters": {
+        "jsCode": "const currentData = $input.all(); \nconst fs = require('fs'); \nconst { spawn } = require('child_process');\n\nconst projectDir = `C:\\\\Users\\\\DEll\\\\my-video`;\nconst publicDir = `${projectDir}\\\\public`;\nconst runId = Date.now();\nconst propsPath = `${projectDir}\\\\props_${runId}.json`;\n\nlet totalFrames = 0;\n\nconst scenesArray = currentData.map((item, i) => {\n    let scene = item.json;\n    let frames = scene.durationInFrames || 150;\n    totalFrames += frames;\n\n    return {\n        scene_number: scene.scene_number || (i + 1),\n        voiceover_ar: scene.voiceover_ar,\n        title: scene.title,\n        video_urls: scene.video_urls,\n        video_url: scene.video_url, \n        audio_url: scene.audio_url, \n        durationInFrames: frames,\n        audioDurationFrames: scene.audioDurationFrames || 0,\n      // 🟢 تمرير مواقع الكلمات المزروعة إلى ريموشن 🟢\n        cta_start: scene.cta_start !== undefined ? scene.cta_start : -1,\n        cta_end: scene.cta_end !== undefined ? scene.cta_end : -1\n    };\n});\n\nconst category = currentData[0]?.json?.category || \"story_craft\";\n\nconst finalJson = {\n    scenes: scenesArray,\n    video_type: category, \n    title: currentData[0]?.json?.title || \"Auto_Video\",\n    total_scenes: scenesArray.length\n};\n\nfs.writeFileSync(propsPath, JSON.stringify(finalJson, null, 2));\n\nfunction runRenderCommand(command, workingDir) {\n  return new Promise((resolve, reject) => {\n    const process = spawn(command, { shell: true, cwd: workingDir });\n    let fullLogs = '';\n    \n    process.stdout.on('data', (data) => { fullLogs += data.toString(); });\n    process.stderr.on('data', (data) => { fullLogs += data.toString(); });\n    \n    process.on('close', (code) => {\n      if (code === 0) resolve(fullLogs);\n      else reject(new Error(`Render failed with code ${code}\\nLogs:\\n${fullLogs}`));\n    });\n  });\n}\n\ntry {\n  // 🚀 التعديل الجوهري: استخدام الـ ID المأخوذ من Supabase كاسم للملف\n  const dbRowId = $('Get many rows (videos_queue)').first().json.id;\n  const outputVideoPath = `C:\\\\Users\\\\DEll\\\\.n8n-files\\\\${dbRowId}.mp4`;\n\n  const renderCommand = `npx remotion render src/index.ts MyVideo \"${outputVideoPath}\" --props=\"${propsPath}\" --concurrency=3 --timeout=120000 --gl=angle`;\n\n  await runRenderCommand(renderCommand, projectDir);\n\n  try {\n    if (fs.existsSync(propsPath)) fs.unlinkSync(propsPath);\n    const files = fs.readdirSync(publicDir);\n    for (const file of files) {\n      if (file.startsWith(`scene_`) || file.startsWith(`voice_`)) {\n        let filePath = `${publicDir}\\\\${file}`;\n        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);\n      }\n    }\n  } catch (cleanupError) {\n    console.log('تنبيه التنظيف: ', cleanupError.message);\n  }\n\n  let mins = Math.floor((totalFrames / 30) / 60);\n  let secs = Math.round((totalFrames / 30) % 60);\n\n  return [{\n    json: {\n      message: `✅ تمت الرندرة بنجاح! طول الفيديو: ${mins} دقيقة و ${secs} ثانية`,\n      video_location: outputVideoPath\n    }\n  }];\n\n} catch (error) {\n  return [{ \n    json: { \n      message: \"❌ حدث خطأ أثناء الرندرة!\", \n      error_details: error.message || error.toString() \n    } \n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        656,
+        144
+      ],
+      "id": "dec4c51e-c926-4b40-a5f6-620a22c59e8b",
+      "name": "Video Renderer",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos_queue",
+        "limit": 1,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "pending"
+            },
+            {
+              "keyName": "category",
+              "condition": "eq",
+              "keyValue": "story_craft"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1376,
+        -288
+      ],
+      "id": "66b9c47b-ded5-461e-84a2-36385930cf3a",
+      "name": "Get many rows (videos_queue)11",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 🟢 تم تغيير الاسم هنا إلى Message a model1 ليتطابق مع اسم عقدة جيميناي في هذا المسار\nconst scriptText = $('Message a model1').item.json.content.parts[0].text;\nlet jsonMatch = scriptText.match(/\\{[\\s\\S]*\\}/);\n\nif (!jsonMatch) {\n  return [{ json: { status: \"failed\", error_message: \"لم يتم العثور على JSON.\" } }];\n}\n\nlet parsedData;\ntry { \n  let safeJsonString = jsonMatch[0].replace(/[\\n\\r\\t]/g, ' ');\n  parsedData = JSON.parse(safeJsonString); \n} \ncatch (error) { \n  return [{ json: { status: \"failed\", error_message: \"JSON غير صالح.\", details: error.message } }]; \n}\n\nconst allItems = []; \n\n// 🟢 تم تغيير الاسم هنا إلى Get many rows (videos_queue)11 ليتطابق مع اسم عقدة القاعدة الأولى في هذا المسار\nconst currentCategory = $('Get many rows (videos_queue)11').first().json.category || \"story_craft\"; \n\nif (parsedData.scenes && Array.isArray(parsedData.scenes)) {\n  parsedData.scenes.forEach(scene => {\n    allItems.push({\n      json: {\n        ...scene,\n        category: currentCategory, \n        title: parsedData.title || \"\",\n        description: parsedData.description || \"\",\n        tags: parsedData.tags || \"\",\n        route_type: \"scene\" \n      }\n    });\n  });\n}\n\nif (parsedData.new_topic) {\n    let strictCategory = currentCategory;\n\n    allItems.push({\n      json: {\n        topic: parsedData.new_topic,\n        category: strictCategory,\n        status: \"pending\",\n        route_type: \"topic\" \n      }\n    });\n}\n\nreturn allItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -448,
+        -496
+      ],
+      "id": "a07ee68f-6610-40a6-8bd9-7c3ab9e5bf50",
+      "name": "Code2",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const scriptText = $('Message a model1').item.json.content.parts[0].text;\nconst jsonMatch = scriptText.match(/\\{[\\s\\S]*\\}/);\nif (!jsonMatch) throw new Error(\"فشل: جيميناي لم يقم بإرجاع JSON صالح!\");\n\nconst parsedData = JSON.parse(jsonMatch[0]);\n\n// 🎯 القوة هنا: استدعاء التصنيف من قاعدة البيانات متجاهلاً أخطاء جيميناي تماماً\nconst dbCategory = $('Get many rows (videos_queue)11').first().json.category || \"story_craft\";\n\nreturn parsedData.scenes.map((scene, index) => {\n  // 🎯 الاعتماد على الفهرس البرمجي (0) لضمان الحقن في المشهد الأول دائماً\n  \n  scene.mood = parsedData.mood || \"mystery\";\n  scene.title = parsedData.title;\n  scene.description = parsedData.description;\n  scene.tags = parsedData.tags;\n  scene.category = dbCategory; \n  \n  return { json: scene };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        64,
+        -512
+      ],
+      "id": "132214ba-2474-41ba-acc9-be36fcf87955",
+      "name": "Code3"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "={{ $json.final_prompt }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.1,
+      "position": [
+        -720,
+        -480
+      ],
+      "id": "a1b6dc84-a709-48db-bfab-58702b6450f2",
+      "name": "Message a model1",
+      "retryOnFail": true,
+      "waitBetweenTries": 5000,
+      "maxTries": 3,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "W9uFINVD7KsCvKdN",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "tableId": "videos_queue",
+        "dataToSend": "autoMapInputData",
+        "inputsToIgnore": "=route_type"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -64,
+        -320
+      ],
+      "id": "f6e6bc92-55cf-4f82-9f6b-c626173e9955",
+      "name": "Get many rows (videos_queue)12",
+      "executeOnce": false,
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.route_type }}",
+                    "rightValue": "scene",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "2ad18120-69fe-4ed6-a54f-fe19a298be6b"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "Scenes"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c9ef6e02-e7cf-46fc-b937-69d072d7c3cd",
+                    "leftValue": "={{ $json.route_type }}",
+                    "rightValue": "topic",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "New Topics"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -256,
+        -496
+      ],
+      "id": "9199ce0d-8d23-4da5-9dfa-f9d0bd2ca4b4",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/30 * * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -2016,
+        -496
+      ],
+      "id": "634688c7-1e74-495f-8419-dddfd8d81fc6",
+      "name": "Schedule Trigger3"
+    },
+    {
+      "parameters": {
+        "jsCode": "const { exec } = require('child_process');\nconst fs = require('fs'); \n\nconst publicDir = `C:\\AutoVideoFactory\\project\\public`;\nif (!fs.existsSync(publicDir)) {\n  fs.mkdirSync(publicDir, { recursive: true });\n}\n\nfunction runCommand(command) {\n  return new Promise((resolve, reject) => {\n    exec(command, (error, stdout, stderr) => {\n      if (error) { reject(error); return; }\n      resolve(stdout);\n    });\n  });\n}\n\nconst items = $input.all();\nconst finalItems = [];\nconst runId = Date.now(); \n\n// 🟢 تحديد المشهد المستهدف (المشهد الأوسط في الفيديو) لكي لا تتكرر الجملة 3 مرات 🟢\nconst targetSceneIndex = Math.floor(items.length / 2);\n\nfor (let i = 0; i < items.length; i++) {\n  let item = items[i].json;\n  \n  let category = item.category || items[0].json.category || \"story_craft\";\n  \n  if (item.voiceover_ar && category !== 'promo') {\n    \n    let safeText = item.voiceover_ar.replace(/\"/g, ' ').replace(/'/g, ' ').replace(/\\n/g, ' ');\n    \n    if (item.title) {\n        let safeTitle = item.title.replace(/\"/g, ' ').replace(/'/g, ' ').replace(/\\n/g, ' ');\n        safeText = safeText.replace(safeTitle, ''); \n    }\n    safeText = safeText.replace(/العنوان:/g, '').trim(); \n\n    // 🟢 السحر هنا: الزرع العضوي الذكي (لمشهد واحد فقط، وبعد اكتمال المعنى) 🟢\n    if ((category === 'story_craft' || category === 'story_religion') && i === targetSceneIndex) {\n        let wordsArray = safeText.split(/\\s+/);\n        let middleIndex = Math.floor(wordsArray.length / 2); \n        \n        // البحث عن أقرب فاصلة أو نقطة بعد المنتصف لكي لا نقطع الجملة\n        let insertIndex = middleIndex;\n        for (let w = middleIndex; w < wordsArray.length; w++) {\n            // إذا كانت الكلمة تنتهي بفاصلة، نقطة، أو علامة استفهام\n            if (wordsArray[w].match(/[.،؟!]/)) {\n                insertIndex = w + 1; // نزرع الجملة بعد هذه الكلمة\n                break;\n            }\n        }\n\n        // إضافة نقاط وفواصل لإجبار المعلق الصوتي (edge-tts) على التوقف لثانية وأخذ نفس\n        let ctaText = \". ولا تنسوا الإعجاب والاشتراك في القناة .\";\n        let ctaWords = ctaText.split(\" \");\n\n        item.cta_start = insertIndex;\n        item.cta_end = insertIndex + ctaWords.length - 1;\n\n        // زرع الجملة في المكان الصحيح\n        wordsArray.splice(insertIndex, 0, ...ctaWords);\n        \n        safeText = wordsArray.join(\" \");\n        item.voiceover_ar = safeText; \n    }\n    \n    let baseName = `voice_${runId}_scene_${item.scene_number || (i + 1)}`;\n    let mp3FileName = `${baseName}.mp3`;\n    let vttFileName = `${baseName}.vtt`; \n    \n    let mp3Path = `${publicDir}\\\\${mp3FileName}`;\n    let vttPath = `${publicDir}\\\\${vttFileName}`;\n    \n    let voiceRate = \"+15%\"; \n    if (category === 'story_religion') {\n        voiceRate = \"+5%\";  \n    }\n\n    let cmd = `edge-tts --voice ar-SA-HamedNeural --rate=\"${voiceRate}\" --pitch=\"-5Hz\" --text \"${safeText}\" --write-media \"${mp3Path}\" --write-subtitles \"${vttPath}\"`;\n    \n    try {\n      await runCommand(cmd);\n      item.audio_url = mp3FileName; \n      item.audio_status = \"Success\";\n\n      let maxSeconds = 0;\n\n      if (fs.existsSync(vttPath)) {\n        try {\n            let vttContent = fs.readFileSync(vttPath, 'utf8');\n            let timeRegex = /(?:(\\d+):)?(\\d+):(\\d+)[.,](\\d+)/g;\n            let match;\n            \n            while ((match = timeRegex.exec(vttContent)) !== null) {\n                let h = match[1] ? parseInt(match[1], 10) : 0;\n                let m = parseInt(match[2], 10);\n                let s = parseInt(match[3], 10);\n                let msFraction = parseFloat(`0.${match[4]}`);\n                let total = (h * 3600) + (m * 60) + s + msFraction;\n                if (total > maxSeconds) maxSeconds = total;\n            }\n        } catch(e) {\n            console.log(\"Error parsing VTT:\", e.message);\n        }\n        try { fs.unlinkSync(vttPath); } catch(e) {}\n      }\n\n      if (maxSeconds === 0) {\n          let wordsCount = safeText.split(/\\s+/).length;\n          maxSeconds = (wordsCount * 0.55) + 1; \n      }\n\n      let audioDurationFrames = Math.ceil(maxSeconds * 30); \n      let exactFrames = audioDurationFrames + 30; \n\n      item.audioDurationFrames = audioDurationFrames; \n      item.durationInFrames = exactFrames; \n\n    } catch (error) {\n      item.audio_status = \"Failed\";\n      item.audio_error = error.message;\n      item.audioDurationFrames = 0;\n      item.durationInFrames = 150;\n    }\n  } else if (category === 'promo') {\n    item.audio_status = \"Skipped (Promo)\";\n    item.audio_url = \"\";\n    item.durationInFrames = 120; \n    item.audioDurationFrames = 0;\n  }\n  \n  finalItems.push({ json: item });\n}\n\nreturn finalItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        -512
+      ],
+      "id": "bd674521-eaa8-4ce7-85a6-16b6635a374e",
+      "name": "Code in JavaScript7"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "prompts",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "is_active",
+              "condition": "eq",
+              "keyValue": "true"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1376,
+        -656
+      ],
+      "id": "dd5c1f8a-cbc4-46c3-a222-1559c8cd08fe",
+      "name": "Get many rows (videos_queue)13",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "jsCode": "const allPrompts = $input.all().map(item => item.json);\n\n// تجميع كل البرومبتات في مصفوفة واحدة وتمريرها للمرحلة التالية بدلاً من الاختيار العشوائي\nreturn [{ json: { all_prompts: allPrompts } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1200,
+        -656
+      ],
+      "id": "6665b735-878b-4ba7-b820-e3cfc6fcdca8",
+      "name": "Code in JavaScript8"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos_queue",
+        "limit": 30,
+        "filterType": "none"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1392,
+        -480
+      ],
+      "id": "16177627-b53f-44be-ba5a-e734711897c4",
+      "name": "Get many rows (videos_queue)14",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet recentTopicsList = items.map(item => item.json.topic).join(\"، \");\nreturn [{ json: { recent_topics: recentTopicsList } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1216,
+        -480
+      ],
+      "id": "fabebf76-5d7d-4a96-ab9d-4d9d535b0009",
+      "name": "Code in JavaScript9"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet mergedData = {};\n\nitems.forEach(item => {\n  mergedData = { ...mergedData, ...item.json };\n});\n\nif (mergedData.all_prompts) {\n    // 🟢 السحر هنا: تحديد صارم ومباشر للبرومبت الواقعي (ID: 1) 🟢\n    let targetId = 1; \n    \n    let matchingPrompt = mergedData.all_prompts.find(p => p.id === targetId) || mergedData.all_prompts[0];\n    let text = matchingPrompt.prompt_content;\n    \n    text = text.replace('{{ $json.topic }}', mergedData.topic || '');\n    text = text.replace('{{ $json.recent_topics }}', mergedData.recent_topics || '');\n    \n    mergedData.final_prompt = text;\n}\n\ndelete mergedData.all_prompts;\nreturn [{ json: mergedData }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -848,
+        -480
+      ],
+      "id": "6db77c2d-5bdc-433c-badc-612123717a3a",
+      "name": "Code in JavaScript10"
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -992,
+        -496
+      ],
+      "id": "9fbdf53f-c4d8-4ca3-9e47-225cec06309b",
+      "name": "Merge1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "videos_queue",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get many rows (videos_queue)11').first().json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "pending"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -416,
+        -336
+      ],
+      "id": "ba5d8b22-ddef-4222-be6b-d71ed6f6955d",
+      "name": "Get many rows (videos_queue)15",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "videos_queue",
+        "matchType": "allFilters",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "id",
+              "condition": "eq",
+              "keyValue": "={{ $('Get many rows (videos_queue)11').first().json.id }}"
+            }
+          ]
+        },
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "status",
+              "fieldValue": "ready"
+            },
+            {
+              "fieldId": "title",
+              "fieldValue": "={{ $('Code3').item.json.title }}"
+            },
+            {
+              "fieldId": "script",
+              "fieldValue": "={{ $('Code3').item.json.description }}"
+            },
+            {
+              "fieldId": "tags",
+              "fieldValue": "={{ $('Code3').item.json.tags }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        832,
+        -512
+      ],
+      "id": "ebf972b0-584a-494b-b5f8-8e7b1a581a64",
+      "name": "Get many rows (videos_queue)16",
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "notes": "videos_queue"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "videos_queue",
+        "returnAll": true,
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "status",
+              "condition": "eq",
+              "keyValue": "ready"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        -1824,
+        -496
+      ],
+      "id": "6a9f3bc3-a1e1-4007-8a54-f493b910d5c1",
+      "name": "Get many rows (videos_queue)17",
+      "alwaysOutputData": true,
+      "credentials": {
+        "supabaseApi": {
+          "id": "TqC8rWPBLoBGQ8KJ",
+          "name": "Supabase account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1804b8bf-5e0f-41c9-b1c4-1e1a3c68fba7",
+              "leftValue": "={{ $input.all().length }}",
+              "rightValue": 4,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -1680,
+        -496
+      ],
+      "id": "148249bb-f4c6-446a-9d63-239d5f99f356",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "jsCode": "const fs = require('fs');\n\nconst items = $input.all();\nconst publicDir = `C:\\AutoVideoFactory\\project\\public`;\nconst baseBackgroundsDir = `C:\\AutoVideoFactory\\backgrounds`;\n\nif (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });\n\nfunction removeTashkeel(text) {\n    if (!text) return \"\";\n    return text.replace(/[\\u064B-\\u0652\\u0640]/g, \"\");\n}\n\nconst preSelectedVideos = [];\n\nfor (let i = 0; i < items.length; i++) {\n    let item = items[i].json;\n\n    let category = item.category || \"story_craft\";\n    let folderName = \"nature\"; // الافتراضي\n    let isStory = false; // متغير لمعرفة هل هو محتوى قصصي أم مؤسسي\n\n    // 🟢 1. تصحيح مسار المجلدات كما طلبت تماماً 🟢\n    if (category === \"story_craft\") {\n        folderName = \"satisfying\";      // الواقعي للمجلد satisfying\n        isStory = true;\n    } else if (category === \"story_religion\") {\n        folderName = \"nature\";  // الديني للمجلد nature\n        isStory = true;\n    } else if (category === \"promo\") {\n        folderName = \"furniture\";   // الإعلاني\n    } else if (category === \"advice\") {\n        folderName = \"promo_wood\";  // النصائح\n    }\n\n    let sourceFolder = `${baseBackgroundsDir}\\\\${folderName}`;\n\n    let availableVideos = [];\n    if (fs.existsSync(sourceFolder)) {\n        availableVideos = fs.readdirSync(sourceFolder).filter(file => file.endsWith('.mp4'));\n    }\n\n    if (availableVideos.length === 0) {\n        throw new Error(`المجلد ${sourceFolder} فارغ تماماً! يرجى إضافة فيديوهات.`);\n    }\n\n    // خلط عشوائي للفيديوهات\n    for (let m = availableVideos.length - 1; m > 0; m--) {\n        const j = Math.floor(Math.random() * (m + 1));\n        [availableVideos[m], availableVideos[j]] = [availableVideos[j], availableVideos[m]];\n    }\n\n    preSelectedVideos.push({ sourceFolder, availableVideos, isStory });\n}\n\nconst finalItems = [];\nlet videoIndex = 0;\n\nfor (let i = 0; i < items.length; i++) {\n    let item = items[i].json;\n    \n    let currentFolderData = preSelectedVideos[i];\n    let sourceFolder = currentFolderData.sourceFolder;\n    let availableVideos = currentFolderData.availableVideos;\n    let isStory = currentFolderData.isStory;\n\n    if (videoIndex >= availableVideos.length) {\n        videoIndex = 0; \n    }\n\n    let selectedVideoUrls = [];\n    \n    // 🟢 2. السحر الديناميكي: حساب عدد الفيديوهات المطلوبة بناءً على مدة الصوت 🟢\n    let videosPerScene = 1; // الافتراضي للمؤسسي (فيديو واحد فقط)\n    \n    if (isStory) {\n        // محاولة استخراج مدة الصوت بالثواني من البيانات (مع وضع 60 ثانية كاحتياط أولي)\n        let durationInSeconds = 60; \n        if (item.audioDurationFrames) {\n            durationInSeconds = item.audioDurationFrames / 30; // تحويل الإطارات إلى ثواني\n        } else if (item.audio_duration) {\n            durationInSeconds = item.audio_duration;\n        } else if (item.durationInFrames) {\n            durationInSeconds = item.durationInFrames / 30;\n        }\n\n        // كل مقطع سيكون 6 ثواني، نقسم المدة الكلية على 6 ونقرب للأكبر\n        const clipDurationSeconds = 6;\n        videosPerScene = Math.ceil(durationInSeconds / clipDurationSeconds);\n        \n        // حماية: التأكد من سحب مقطع واحد على الأقل حتى لو كانت المدة قصيرة جداً\n        if (videosPerScene < 1) videosPerScene = 1;\n    }\n\n    try {\n        for (let v = 0; v < videosPerScene; v++) {\n            // العودة لأول فيديو في المجلد إذا طلب الكود فيديوهات أكثر من المتاحة\n            if (videoIndex >= availableVideos.length) videoIndex = 0; \n            \n            let selectedVideoName = availableVideos[videoIndex];\n            let sourceVideoPath = `${sourceFolder}\\\\${selectedVideoName}`;\n            let localVideoName = `scene_${item.scene_number || (i + 1)}_part_${v}.mp4`;\n            let targetVideoPath = `${publicDir}\\\\${localVideoName}`;\n            \n            if (fs.existsSync(targetVideoPath)) fs.unlinkSync(targetVideoPath);\n            fs.copyFileSync(sourceVideoPath, targetVideoPath);\n            \n            selectedVideoUrls.push(localVideoName);\n            videoIndex++;\n        }\n\n        if (item.voiceover_ar) {\n            item.voiceover_ar = removeTashkeel(item.voiceover_ar);\n        }\n\n        // 🟢 3. توجيه المخرجات لبرنامج المونتاج 🟢\n        if (isStory) {\n            item.video_urls = selectedVideoUrls; // نرسل المصفوفة الديناميكية للقصص\n            item.video_url = selectedVideoUrls[0]; \n            item.download_status = `Success (${videosPerScene} Alternating Clips)`;\n        } else {\n            item.video_urls = []; // نفرغ المصفوفة في الإعلاني لمنع التناوب\n            item.video_url = selectedVideoUrls[0]; // نرسل فيديو واحد فقط\n            item.download_status = \"Success (Single Promo Video)\";\n        }\n\n    } catch (e) {\n        item.download_status = \"Failed\";\n        item.video_urls = [];\n        item.video_url = \"\";\n        item.error_details = e.message;\n    }\n\n    finalItems.push({ json: item });\n}\n\nreturn finalItems;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        -512
+      ],
+      "id": "3a3f0793-5f32-4649-86e3-b775867a959f",
+      "name": "Video Downloader2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const currentData = $input.all(); \nconst fs = require('fs'); \nconst { spawn } = require('child_process');\n\nconst projectDir = `C:\\AutoVideoFactory\\project`;\nconst publicDir = `${projectDir}\\\\public`;\nconst runId = Date.now();\nconst propsPath = `${projectDir}\\\\props_${runId}.json`;\n\nlet totalFrames = 0;\n\nconst scenesArray = currentData.map((item, i) => {\n    let scene = item.json;\n    let frames = scene.durationInFrames || 150;\n    totalFrames += frames;\n\n    return {\n        scene_number: scene.scene_number || (i + 1),\n        voiceover_ar: scene.voiceover_ar,\n        title: scene.title,\n        video_urls: scene.video_urls,\n        video_url: scene.video_url, \n        audio_url: scene.audio_url, \n        durationInFrames: frames,\n        audioDurationFrames: scene.audioDurationFrames || 0,\n      // 🟢 تمرير مواقع الكلمات المزروعة إلى ريموشن 🟢\n        cta_start: scene.cta_start !== undefined ? scene.cta_start : -1,\n        cta_end: scene.cta_end !== undefined ? scene.cta_end : -1\n    };\n});\n\nconst category = currentData[0]?.json?.category || \"story_craft\";\n\nconst finalJson = {\n    scenes: scenesArray,\n    video_type: category, \n    title: currentData[0]?.json?.title || \"Auto_Video\",\n    total_scenes: scenesArray.length\n};\n\nfs.writeFileSync(propsPath, JSON.stringify(finalJson, null, 2));\n\nfunction runRenderCommand(command, workingDir) {\n  return new Promise((resolve, reject) => {\n    const process = spawn(command, { shell: true, cwd: workingDir });\n    let fullLogs = '';\n    \n    process.stdout.on('data', (data) => { fullLogs += data.toString(); });\n    process.stderr.on('data', (data) => { fullLogs += data.toString(); });\n    \n    process.on('close', (code) => {\n      if (code === 0) resolve(fullLogs);\n      else reject(new Error(`Render failed with code ${code}\\nLogs:\\n${fullLogs}`));\n    });\n  });\n}\n\ntry {\n  // 🚀 التعديل الجوهري: استخدام الـ ID المأخوذ من Supabase كاسم للملف\n  const dbRowId = $('Get many rows (videos_queue)11').first().json.id;\n  const outputVideoPath = `C:\\\\Users\\\\DEll\\\\.n8n-files\\\\${dbRowId}.mp4`;\n\n  const renderCommand = `npx remotion render src/index.ts MyVideo \"${outputVideoPath}\" --props=\"${propsPath}\" --concurrency=3 --timeout=120000 --gl=angle`;\n\n  await runRenderCommand(renderCommand, projectDir);\n\n  try {\n    if (fs.existsSync(propsPath)) fs.unlinkSync(propsPath);\n    const files = fs.readdirSync(publicDir);\n    for (const file of files) {\n      if (file.startsWith(`scene_`) || file.startsWith(`voice_`)) {\n        let filePath = `${publicDir}\\\\${file}`;\n        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);\n      }\n    }\n  } catch (cleanupError) {\n    console.log('تنبيه التنظيف: ', cleanupError.message);\n  }\n\n  let mins = Math.floor((totalFrames / 30) / 60);\n  let secs = Math.round((totalFrames / 30) % 60);\n\n  return [{\n    json: {\n      message: `✅ rendering done : ${mins} minute و ${secs} second`,\n      video_location: outputVideoPath\n    }\n  }];\n\n} catch (error) {\n  return [{ \n    json: { \n      message: \"❌ حدث خطأ أثناء الرندرة!\", \n      error_details: error.message || error.toString() \n    } \n  }];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        -512
+      ],
+      "id": "68acfd48-5263-457f-936f-5b5721f662b8",
+      "name": "Video Renderer2",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Code": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows (videos_queue)": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Code",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many rows (videos_queue)5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Code1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many rows (videos_queue)2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get many rows (videos_queue)8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript3": {
+      "main": [
+        [
+          {
+            "node": "Video Downloader",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows (videos_queue)3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows (videos_queue)4": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript4": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows (videos_queue)8": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get many rows (videos_queue)3",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get many rows (videos_queue)4",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get many rows (videos_queue)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Downloader": {
+      "main": [
+        [
+          {
+            "node": "Video Renderer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Renderer": {
+      "main": [
+        [
+          {
+            "node": "Get many rows (videos_queue)6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows (videos_queue)11": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Code2": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code3": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model1": {
+      "main": [
+        [
+          {
+            "node": "Code2",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many rows (videos_queue)15",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Code3",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many rows (videos_queue)12",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger3": {
+      "main": [
+        [
+          {
+            "node": "Get many rows (videos_queue)17",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript7": {
+      "main": [
+        [
+          {
+            "node": "Video Downloader2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows (videos_queue)13": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript8": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows (videos_queue)14": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript9",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript9": {
+      "main": [
+        [
+          {
+            "node": "Merge1",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript10": {
+      "main": [
+        [
+          {
+            "node": "Message a model1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript10",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows (videos_queue)17": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Get many rows (videos_queue)13",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get many rows (videos_queue)14",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Get many rows (videos_queue)11",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Downloader2": {
+      "main": [
+        [
+          {
+            "node": "Video Renderer2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Renderer2": {
+      "main": [
+        [
+          {
+            "node": "Get many rows (videos_queue)16",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "timezone": "Asia/Riyadh",
+    "callerPolicy": "workflowsFromSameOwner",
+    "saveDataSuccessExecution": "none",
+    "executionTimeout": 3600
+  },
+  "versionId": "e2266b72-0b90-4193-a3c4-737aa7aec691",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b2e4d510474f0b7e524f121cf2acc761872752802d0e0f42b9696eba56288a13"
+  },
+  "id": "sPTc3YMlX4Xre5l7",
+  "tags": []
+}
